@@ -25,7 +25,8 @@ def send_mailing():
                 fail_silently=False)
             if server_response == 1:
                 server_response = 'Письмо успешно отправлено'
-                MailingStatus.objects.create(status=LOGS_STATUS_CHOICES[0][1], server_response=server_response, mailing_list=mailing)
+                MailingStatus.objects.create(status=LOGS_STATUS_CHOICES[0][1], server_response=server_response,
+                                             mailing_list=mailing)
             mailing.setting_status = 'Create'
 
             if mailing.sending == 'once' and server_response == 1:

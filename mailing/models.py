@@ -1,6 +1,7 @@
 from django.db import models
 
 from recipient.models import Recipient
+from users.models import User
 
 NULLABLE = {'null': True, 'blank': True}
 
@@ -19,6 +20,12 @@ class MailingMessage(models.Model):
     content = models.TextField(
         verbose_name='Содержание',
         help_text='Введите текст сообщения'
+    )
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        **NULLABLE,
+        verbose_name='Владелец'
     )
 
     class Meta:
@@ -58,10 +65,19 @@ class MailingSettings(models.Model):
         Recipient,
         verbose_name='Получатели'
     )
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        **NULLABLE,
+        verbose_name='Владелец'
+    )
 
     class Meta:
         verbose_name = 'Настройка рассылки'
         verbose_name_plural = 'Настройки рассылок'
+        permissions = [
+            ('change_mailingsettings_setting_status', 'Can change mailingsettings setting_status')
+        ]
 
     def __str__(self):
         return f'{self.message} отправляется {self.sending} с {self.start_time}'

@@ -1,40 +1,75 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse_lazy
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.core.exceptions import PermissionDenied
+from django.urls import reverse_lazy, reverse
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 
+from mailing.forms import MailingSettingsForm, MailingMessageForm, MailingModeratorForm
 from mailing.models import MailingMessage, MailingSettings, MailingStatus
+from mailing.servives import get_blog_from_cache
+from recipient.models import Recipient
 
 
-class MailingMessageListView(ListView):
+class MailingMessageTemplateView(LoginRequiredMixin, TemplateView):
+    template_name = 'mailing/home.html'
+
+    def get_context_data(self, **kwargs):
+        context_data = super().get_context_data(**kwargs)
+        context_data['blogs'] = get_blog_from_cache()
+        mailing_settings = MailingSettings.objects.all()
+        context_data['mailing_settings'] = len(mailing_settings)
+        active_mailing = MailingSettings.objects.filter(setting_status='Started')
+        context_data['active_mailing'] = len(active_mailing)
+        recipients = Recipient.objects.all()
+        context_data['recipient'] = len(recipients)
+        return context_data
+
+
+class MailingMessageListView(LoginRequiredMixin, ListView):
     model = MailingMessage
 
 
-class MailingMessageDetailView(DetailView):
+class MailingMessageDetailView(LoginRequiredMixin, DetailView):
     model = MailingMessage
 
 
-class MailingMessageCreateView(CreateView):
+class MailingMessageCreateView(LoginRequiredMixin, CreateView):
     model = MailingMessage
-    fields = ('title', 'content')
+    form_class = MailingMessageForm
+    success_url = reverse_lazy('mailing:list')
+
+    def form_valid(self, form):
+        message = form.save()
+        message.owner = self.request.user
+        message.save()
+        return super().form_valid(form)
+
+
+class MailingMessageUpdateView(LoginRequiredMixin, UpdateView):
+    model = MailingMessage
+    form_class = MailingMessageForm
     success_url = reverse_lazy('mailing:list')
 
 
-class MailingMessageUpdateView(UpdateView):
-    model = MailingMessage
-    fields = ('title', 'content')
-    success_url = reverse_lazy('mailing:list')
-
-
-class MailingMessageDeleteView(DeleteView):
+class MailingMessageDeleteView(LoginRequiredMixin, DeleteView):
     model = MailingMessage
     success_url = reverse_lazy('mailing:list')
 
 
-class MailingSettingsCreateView(CreateView):
+class MailingSettingsCreateView(LoginRequiredMixin, CreateView):
     model = MailingSettings
-    fields = ('sending', 'recipients', 'message', 'end_time')
-    # form_class = MailingSettingsForm
+    form_class = MailingSettingsForm
     success_url = reverse_lazy('mailing:settings_list')
+
+    def form_valid(self, form):
+        setting = form.save()
+        setting.owner = self.request.user
+        setting.save()
+        return super().form_valid(form)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({'request': self.request})
+        return kwargs
 
 
 #
@@ -49,9 +84,19 @@ class MailingSettingsCreateView(CreateView):
 #
 class MailingSettingsUpdateView(LoginRequiredMixin, UpdateView):
     model = MailingSettings
-    fields = ('sending', 'recipients', 'message', 'end_time')
-    # form_class = MailingSettingsForm
-    success_url = reverse_lazy('mailing:settings_list')
+    form_class = MailingSettingsForm
+
+    def get_success_url(self):
+        mailing = self.get_object()
+        return reverse('mailing:settings_view', args=[mailing.pk])
+
+    def get_form_class(self):
+        user = self.request.user
+        if user == self.object.owner or user.is_superuser:
+            return MailingSettingsForm
+        if user.has_perm('mailing.change_mailingsettings_setting_status'):
+            return MailingModeratorForm
+        return PermissionDenied
 
 
 #
@@ -65,15 +110,15 @@ class MailingSettingsUpdateView(LoginRequiredMixin, UpdateView):
 #         raise PermissionDenied
 #
 #
-class MailingSettingsListView(ListView):
+class MailingSettingsListView(LoginRequiredMixin, ListView):
     model = MailingSettings
 
 
-class MailingSettingsDetailView(DetailView):
+class MailingSettingsDetailView(LoginRequiredMixin, DetailView):
     model = MailingSettings
 
 
-class MailingSettingsDeleteView(DeleteView):
+class MailingSettingsDeleteView(LoginRequiredMixin, DeleteView):
     model = MailingSettings
     success_url = reverse_lazy('mailing:settings_list')
 

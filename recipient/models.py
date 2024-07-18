@@ -1,5 +1,7 @@
 from django.db import models
 
+from users.models import User
+
 NULLABLE = {'null': True, 'blank': True}
 
 
@@ -19,6 +21,12 @@ class Recipient(models.Model):
         verbose_name='Комментарий',
         **NULLABLE,
         help_text='Напишите комментарий'
+    )
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        **NULLABLE,
+        verbose_name='Владелец'
     )
 
     class Meta:
